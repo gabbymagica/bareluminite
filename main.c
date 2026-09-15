@@ -9,15 +9,11 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <string.h>
+#include "packets.h"
+#include "player.h"
 
 #define MAX_CLIENTS 10
 #define TICK_RATE_MS 16 // 60 tps
-
-typedef struct {
-    int fd;
-    char incoming_buffer[1024];
-    int buffer_bytes;
-} Client;
 
 uint64_t get_time_micro() {
     struct timespec ts;
@@ -134,29 +130,12 @@ int main_loop(int server_fd) {
                     }
                     printf("\n");
 
-                    switch (packet_id) {
-                        case 1:
-                            printf("Jogador no slot %d quer conectar. Aprovando...\n", i);
+                    uint8_t *payload = client->incoming_buffer + 3;
+                    uint16_t payload_len = packet_length - 3;
 
-                            uint8_t response[4];
+                    handle_client_packet(client, i, packet_id, payload, payload_len);
 
-                            response[0] = 0x04; // 4
-                            response[1] = 0x00; // 0
-
-                            response[2] = 0x03;
-
-                            response[3] = (uint8_t)i;
-
-                            int bytes_sent = send(client->fd, response, sizeof(response), 0);
-
-                            if (bytes_sent < 0) {
-                                printf("Erro ao enviar resposta para o cliente %d\n", i);
-                            } else {
-                                printf("Enviado pacote ID 3 (Connection Approved) de %d bytes.\n", bytes_sent);
-                            }
-                            break;
-                    }
-
+                    // move the next message bytes buffer to the start and continue the loop
                     int remaining_bytes = client->buffer_bytes - packet_length;
                     if (remaining_bytes > 0) {
                         memmove(client->incoming_buffer, client->incoming_buffer + packet_length, remaining_bytes);
